@@ -5,13 +5,35 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/dimkarp93/install-libs/buildinfo"
+	mdlib "github.com/dimkarp93/md-libs"
+	"github.com/dimkarp93/md-libs/render"
 )
 
-var version = "dev"
+var (
+	version  string
+	origin   string
+	upstream string
+	commit   string
+	channel  string
+)
+
+func build() buildinfo.Info {
+	return buildinfo.Info{
+		Version:  version,
+		Origin:   origin,
+		Upstream: upstream,
+		Commit:   commit,
+		Channel:  channel,
+	}
+}
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.BoolVar(showVersion, "v", false, "print version and exit")
+	showOrigin := flag.Bool("origin", false, "print the repository the binary was built from and exit")
+	showBuildInfo := flag.Bool("buildinfo", false, "print build metadata and exit")
 	inPath := flag.String("in", "", "input markdown file (default: stdin)")
 	outPath := flag.String("out", "", "output pdf file (default: stdout)")
 	pagesFlag := flag.String("pages", "", "pages to include, e.g. 1,3-5 (default: all pages except 0)")
@@ -19,8 +41,15 @@ func main() {
 	rootHeadHide := flag.Bool("root-head-hide", false, "hide headings matched by --heads, keep their content")
 	flag.Parse()
 
-	if *showVersion {
-		fmt.Println(version)
+	switch {
+	case *showVersion:
+		fmt.Println(build().VersionString())
+		return
+	case *showOrigin:
+		fmt.Println(build().OriginString())
+		return
+	case *showBuildInfo:
+		build().Print()
 		return
 	}
 
@@ -36,49 +65,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	pagesRaw := splitPages(string(data))
-	maxPage := len(pagesRaw) - 1
-
-	var selected []int
-	if *pagesFlag == "" {
-		for i := 1; i <= maxPage; i++ {
-			selected = append(selected, i)
-		}
-	} else {
-		req, err := parsePageRanges(*pagesFlag)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "invalid --pages: %v\n", err)
-			os.Exit(1)
-		}
-		for _, idx := range req {
-			if idx >= 0 && idx <= maxPage {
-				selected = append(selected, idx)
-			}
-		}
+	blocks, err := mdlib.Prepare(string(data), mdlib.Options{
+		Pages:            *pagesFlag,
+		Heads:            *headsFlag,
+		HideMatchedHeads: *rootHeadHide,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
 	}
 
-	var filters []headFilter
-	if *headsFlag != "" {
-		filters, err = parseHeadFilters(*headsFlag)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "invalid --heads: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
-	var allBlocks []block
-	for i, pi := range selected {
-		if i > 0 {
-			allBlocks = append(allBlocks, block{kind: blockPageBreak})
-		}
-		allBlocks = append(allBlocks, parseMarkdown(pagesRaw[pi])...)
-	}
-	if filters != nil {
-		allBlocks = filterByHeads(allBlocks, filters, *rootHeadHide)
-	}
-
-	pdf := newPDF()
-	renderPDFBody(pdf, allBlocks)
+	r := newPDFRenderer()
+	render.Blocks(r, blocks)
 
 	out := io.Writer(os.Stdout)
 	if *outPath != "" {
@@ -91,7 +89,7 @@ func main() {
 		out = f
 	}
 
-	if err := pdf.Output(out); err != nil {
+	if err := r.Output(out); err != nil {
 		fmt.Fprintf(os.Stderr, "write output: %v\n", err)
 		os.Exit(1)
 	}
