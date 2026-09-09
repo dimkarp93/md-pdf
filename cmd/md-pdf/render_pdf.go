@@ -1,8 +1,11 @@
 package main
 
 import (
+	"io"
 	"strings"
 
+	"github.com/dimkarp93/md-libs/markdown"
+	"github.com/dimkarp93/md-libs/render"
 	"github.com/go-pdf/fpdf"
 )
 
@@ -13,23 +16,6 @@ const (
 	mmPerPt          = 0.3528
 	lineHeightFactor = 0.42
 )
-
-func headingSizePt(level int) float64 {
-	switch level {
-	case 1:
-		return 18
-	case 2:
-		return 16
-	case 3:
-		return 14
-	case 4:
-		return 13
-	case 5:
-		return 12
-	default:
-		return 11
-	}
-}
 
 func lineHeightMM(sizePt float64) float64 {
 	return sizePt * lineHeightFactor
@@ -46,7 +32,11 @@ func styleFor(bold, italic bool) string {
 	return s
 }
 
-func newPDF() *fpdf.Fpdf {
+type pdfRenderer struct {
+	pdf *fpdf.Fpdf
+}
+
+func newPDFRenderer() *pdfRenderer {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.AddUTF8FontFromBytes(fontFamily, "", fontRegular)
 	pdf.AddUTF8FontFromBytes(fontFamily, "B", fontBold)
@@ -55,59 +45,52 @@ func newPDF() *fpdf.Fpdf {
 	pdf.SetMargins(25, 25, 20)
 	pdf.SetAutoPageBreak(true, 25)
 	pdf.AddPage()
-	return pdf
+	return &pdfRenderer{pdf: pdf}
 }
 
-func writeRuns(pdf *fpdf.Fpdf, runs []run, sizePt float64, forceBold bool) {
+func (p *pdfRenderer) writeRuns(runs []markdown.Run, sizePt float64, forceBold bool) {
 	h := lineHeightMM(sizePt)
 	for _, r := range runs {
-		pdf.SetFont(fontFamily, styleFor(r.bold || forceBold, r.italic), sizePt)
-		pdf.Write(h, r.text)
+		p.pdf.SetFont(fontFamily, styleFor(r.Bold || forceBold, r.Italic), sizePt)
+		p.pdf.Write(h, r.Text)
 	}
 }
 
-func renderHeadingPDF(pdf *fpdf.Fpdf, level int, text string) {
-	size := headingSizePt(level)
+func (p *pdfRenderer) Heading(level int, text string) {
+	size := render.HeadingSizePt(level)
 	h := lineHeightMM(size)
-	pdf.Ln(12 * mmPerPt)
-	writeRuns(pdf, parseInline(text, false), size, true)
-	pdf.Ln(h)
-	pdf.Ln(6 * mmPerPt)
+	p.pdf.Ln(12 * mmPerPt)
+	p.writeRuns(markdown.ParseInline(text, false), size, true)
+	p.pdf.Ln(h)
+	p.pdf.Ln(6 * mmPerPt)
 }
 
-func renderParagraphPDF(pdf *fpdf.Fpdf, text string) {
+func (p *pdfRenderer) Paragraph(text string) {
 	h := lineHeightMM(bodySizePt)
 	for _, line := range strings.Split(text, "\n") {
-		writeRuns(pdf, parseInline(line, true), bodySizePt, false)
-		pdf.Ln(h)
+		p.writeRuns(markdown.ParseInline(line, true), bodySizePt, false)
+		p.pdf.Ln(h)
 	}
-	pdf.Ln(6 * mmPerPt)
+	p.pdf.Ln(6 * mmPerPt)
 }
 
-func renderCodeLinePDF(pdf *fpdf.Fpdf, line string) {
-	text := strings.ReplaceAll(line, "\t", "    ")
-	if text == "" {
-		text = " "
-	}
+func (p *pdfRenderer) Code(lines []string) {
 	h := lineHeightMM(codeSizePt)
-	pdf.SetFont(fontFamily, "", codeSizePt)
-	pdf.SetFillColor(242, 242, 242)
-	pdf.MultiCell(0, h, text, "", "L", true)
+	for _, line := range lines {
+		text := strings.ReplaceAll(line, "\t", "    ")
+		if text == "" {
+			text = " "
+		}
+		p.pdf.SetFont(fontFamily, "", codeSizePt)
+		p.pdf.SetFillColor(242, 242, 242)
+		p.pdf.MultiCell(0, h, text, "", "L", true)
+	}
 }
 
-func renderPDFBody(pdf *fpdf.Fpdf, blocks []block) {
-	for _, b := range blocks {
-		switch b.kind {
-		case blockHeading:
-			renderHeadingPDF(pdf, b.level, b.text)
-		case blockCode:
-			for _, line := range b.lines {
-				renderCodeLinePDF(pdf, line)
-			}
-		case blockPageBreak:
-			pdf.AddPage()
-		default:
-			renderParagraphPDF(pdf, b.text)
-		}
-	}
+func (p *pdfRenderer) PageBreak() {
+	p.pdf.AddPage()
+}
+
+func (p *pdfRenderer) Output(w io.Writer) error {
+	return p.pdf.Output(w)
 }
