@@ -1,104 +1,110 @@
 # md-pdf
 
-Простая утилита для конвертации Markdown-файла в `.pdf`. Устроена так же, как [md-docx](../md-docx), только вместо `.docx` собирает PDF через библиотеку [`github.com/go-pdf/fpdf`](https://github.com/go-pdf/fpdf) (единственная внешняя зависимость — генерация PDF-байткода вручную поверх stdlib слишком трудоёмка и хрупка).
+A simple utility that converts a Markdown file into `.pdf`. It is built exactly like [md-docx](../md-docx), except that instead of a `.docx` it assembles a PDF through the [`github.com/go-pdf/fpdf`](https://github.com/go-pdf/fpdf) library (the only external dependency — generating PDF bytecode by hand on top of the stdlib is too laborious and fragile).
 
-Для поддержки кириллицы используется встроенный (через `go:embed`) шрифт DejaVu Sans Condensed — обычные встроенные PDF-шрифты (Helvetica/Courier) кириллицу не поддерживают. Шрифт зашит в бинарник, сетевой доступ в рантайме не требуется.
+To support Cyrillic it uses the DejaVu Sans Condensed font embedded via `go:embed` — the standard built-in PDF fonts (Helvetica/Courier) do not support Cyrillic. The font is baked into the binary, so no network access is required at runtime.
 
-## Поддерживаемый синтаксис
+## Supported syntax
 
-1. Заголовки: `#` … `######` (уровни 1–6).
-2. Жирный: `**текст**` или `__текст__`.
-3. Курсив: `*текст*` или `_текст_` (в заголовках `_` разметкой не считается).
-4. Жирный курсив: `***текст***`.
-5. Блоки кода: `` ```...``` `` — рендерятся тем же шрифтом (моноширинного варианта с кириллицей в комплекте нет) с серой заливкой; длинные строки переносятся по ширине страницы, табы заменяются пробелами.
+1. Headings: `#` … `######` (levels 1–6).
+2. Bold: `**text**` or `__text__`.
+3. Italic: `*text*` or `_text_` (inside headings `_` is not treated as markup).
+4. Bold italic: `***text***`.
+5. Code blocks: `` ```...``` `` — rendered in the same font (there is no monospace variant with Cyrillic in the bundle) with a grey fill; long lines wrap to the page width and tabs are replaced with spaces.
 
-Всё остальное считается обычным текстовым параграфом. Строки без пустой строки между ними объединяются в один абзац с переносом строки внутри; пустая строка в исходнике даёт видимый отступ между абзацами.
+Everything else is treated as a regular text paragraph. Lines with no blank line between them are merged into a single paragraph with a line break inside; a blank line in the source produces a visible gap between paragraphs.
 
-## Сборка
+## Build
 
-Требуется Go 1.26+.
+Requires Go 1.26+.
 
 ```bash
 make build
 ```
 
-Бинарник появится в корне репозитория — `./md-pdf`.
+The binary appears in the repository root — `./md-pdf`.
 
-## Использование
+## Usage
 
 ```bash
 ./md-pdf --in input.md --out output.pdf
 ```
 
-- `--in` (опционально) — путь к исходному Markdown-файлу. Если не указан, читает из stdin.
-- `--out` (опционально) — путь к выходному `.pdf`. Если не указан, пишет в stdout.
-- `--pages` (опционально) — какие страницы включить, например `1,3-5`. По умолчанию — все страницы, кроме страницы 0.
-- `--heads` (опционально) — фильтр по заголовкам, например `h2:result,h3:resume,summary`. По умолчанию фильтрации нет.
-- `--root-head-hide` — скрывает заголовки, по которым сработал матч `--heads`, оставляя их содержимое.
-- `--version` / `-v` — печатает версию и завершает работу.
+- `--in` (optional) — path to the source Markdown file. If omitted, reads from stdin.
+- `--out` (optional) — path to the output `.pdf`. If omitted, writes to stdout.
+- `--pages` (optional) — which pages to include, for example `1,3-5`. By default — every page except page 0.
+- `--heads` (optional) — a heading filter, for example `h2:result,h3:resume,summary`. By default there is no filtering.
+- `--root-head-hide` — hides the headings matched by `--heads`, keeping their content.
+- `--version` / `-v` — prints the version and exits.
 
-Также поддерживается через stdin/stdout:
+stdin/stdout are supported as well:
 
 ```bash
 cat input.md | ./md-pdf > output.pdf
 ```
 
-### Frontmatter, страницы и фильтр по заголовкам
+### Frontmatter, pages and the heading filter
 
-Семантика полностью совпадает с [md-docx](../md-docx/README.md#frontmatter-и-страницы):
+The semantics are exactly the same as in [md-docx](../md-docx/README.md#frontmatter-and-pages):
 
-- Если файл начинается со строки `---`, всё до следующей `---` — frontmatter (страница 0), не попадает в результат, если не запрошена явно через `--pages=0`.
-- Остальные строки-разделители `---` (вне блоков кода) делят документ на страницы 1, 2, 3, … По умолчанию выводятся все, кроме страницы 0; конкретные страницы выбираются через `--pages=1,3-5`.
-- Между каждыми двумя соседними выбранными страницами в PDF вставляется настоящий разрыв страницы.
-- `--heads=h2:result,resume` оставляет только содержимое под указанными заголовками (и их вложенным контентом); вложенность считается по всему выбранному документу целиком, сквозь разрывы страниц. Имя без префикса уровня (`resume`) матчит заголовок любого уровня.
+- If the file starts with a `---` line, everything up to the next `---` is frontmatter (page 0) and does not make it into the result unless requested explicitly through `--pages=0`.
+- The other `---` separator lines (outside code blocks) split the document into pages 1, 2, 3, … By default every page except page 0 is emitted; specific pages are selected with `--pages=1,3-5`.
+- Between every two adjacent selected pages a real page break is inserted into the PDF.
+- `--heads=h2:result,resume` keeps only the content under the given headings (and their nested content); nesting is computed across the selected document as a whole, through page breaks. A name without a level prefix (`resume`) matches a heading at any level.
 
-## Очистка
+## Clean
 
 ```bash
 make clean
 ```
 
-Удаляет собранный бинарник.
+Removes the built binary.
 
-## Разработка
+## Development
 
-Парсинг markdown, фильтрация по заголовкам и контракт рендеринга вынесены в общую библиотеку [md-libs](https://github.com/dimkarp93/md-libs) — та же библиотека используется в [md-docx](https://github.com/dimkarp93/md-docx). В этом репозитории остаётся только рендеринг в PDF (fpdf + встроенные шрифты DejaVu) и разбор флагов.
+Markdown parsing, heading filtering and the rendering contract live in the shared library [md-libs](https://github.com/dimkarp93/md-libs) — the same library is used by [md-docx](https://github.com/dimkarp93/md-docx). What remains in this repository is only the PDF rendering (fpdf + the embedded DejaVu fonts) and the flag parsing.
 
-Обычная сборка тянет md-libs как зависимость с GitHub, ничего настраивать не нужно:
+A normal build pulls md-libs from GitHub as a dependency, nothing has to be configured:
 
 ```bash
 make build
 ```
 
-Если нужно править библиотеку и CLI одновременно, склонируйте md-libs рядом и включите workspace:
+If you need to change the library and the CLI at the same time, clone md-libs next to this repository and enable the workspace:
 
 ```bash
 git clone https://github.com/dimkarp93/md-libs ../md-libs
 make configure
 ```
 
-`make configure` копирует `go.work.local` в `go.work` — после этого сборка и тесты берут md-libs из соседней папки, а не из сети. Сам `go.work` не коммитится (он в `.gitignore`), поэтому CI и `go install` продолжают работать с опубликованной версией.
+`make configure` copies `go.work.local` to `go.work` — after that the build and the tests take md-libs from the neighbouring directory instead of the network. `go.work` itself is not committed (it is in `.gitignore`), so CI and `go install` keep working with the published version.
 
 ```bash
 make unconfigure
 ```
 
-Возвращает сборку на опубликованную версию библиотеки.
+Returns the build to the published version of the library.
 
-### Тесты
+### Tests
 
 ```sh
-make test                  # тесты рендерера и сквозные тесты CLI
-make test-v                # то же, с именами тестов
+make test                  # renderer tests and end-to-end CLI tests
+make test-v                # the same, with test names
 make test-run T=TestCLIVersion
-make cover                 # покрытие
+make cover                 # coverage
 make check                 # vet + test
 ```
 
-Общее ядро (парсинг, фильтры, пайплайн) тестируется в [md-libs](https://github.com/dimkarp93/md-libs); здесь проверяется только то, что специфично для этого CLI. `make test-all` в md-libs прогоняет всё сразу.
+The shared core (parsing, filters, pipeline) is tested in [md-libs](https://github.com/dimkarp93/md-libs); only what is specific to this CLI is checked here. `make test-all` in md-libs runs everything at once.
 
-Обновление до новой версии md-libs:
+Upgrading to a new version of md-libs:
 
 ```bash
-GOWORK=off go get github.com/dimkarp93/md-libs@v0.2.0
+GOWORK=off go get github.com/dimkarp93/md-libs@v0.1.1
 ```
+
+## License
+
+[MIT](LICENSE)
+
+The bundled DejaVu Sans Condensed fonts (`cmd/md-pdf/fonts/`) are distributed under the [DejaVu Fonts License](https://dejavu-fonts.github.io/License.html).

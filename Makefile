@@ -26,13 +26,13 @@ test-v: hint
 	go test -v ./...
 
 test-run: hint
-	@test -n "$(T)" || { echo "укажите тест: make test-run T=TestPageBreakAddsAPage"; exit 1; }
+	@test -n "$(T)" || { echo "specify a test: make test-run T=TestPageBreakAddsAPage"; exit 1; }
 	go test -v -run '$(T)' ./...
 
 cover: hint
 	go test -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out | tail -1
-	@echo "детальный отчёт: go tool cover -html=coverage.out"
+	@echo "detailed report: go tool cover -html=coverage.out"
 
 check: vet test
 
@@ -40,15 +40,15 @@ vet: hint
 	go vet ./...
 
 hint:
-	@test -f go.work -o -f go.sum || echo "подсказка: md-libs/install-libs недоступны — выполните make configure"
+	@test -f go.work -o -f go.sum || echo "hint: md-libs/install-libs are unavailable — run make configure"
 
 clean:
 	rm -f $(BINARY)
 	rm -rf bin
 
 configure:
-	@test -d ../md-libs || { echo "../md-libs не найден: клонируйте github.com/dimkarp93/md-libs рядом с этим репозиторием"; exit 1; }
-	@test -d ../install-libs || { echo "../install-libs не найден: клонируйте github.com/dimkarp93/install-libs рядом с этим репозиторием"; exit 1; }
+	@test -d ../md-libs || { echo "../md-libs not found: clone github.com/dimkarp93/md-libs next to this repository"; exit 1; }
+	@test -d ../install-libs || { echo "../install-libs not found: clone github.com/dimkarp93/install-libs next to this repository"; exit 1; }
 	cp go.work.local go.work
 	go build -o /dev/null ./...
 
