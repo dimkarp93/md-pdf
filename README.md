@@ -27,7 +27,7 @@ The binary appears in the repository root — `./md-pdf`.
 ## Usage
 
 ```bash
-./md-pdf --in input.md --out output.pdf
+./md-pdf convert --in input.md --out output.pdf
 ```
 
 - `--in` (optional) — path to the source Markdown file. If omitted, reads from stdin.
@@ -40,7 +40,7 @@ The binary appears in the repository root — `./md-pdf`.
 stdin/stdout are supported as well:
 
 ```bash
-cat input.md | ./md-pdf > output.pdf
+cat input.md | ./md-pdf convert > output.pdf
 ```
 
 ### Frontmatter, pages and the heading filter

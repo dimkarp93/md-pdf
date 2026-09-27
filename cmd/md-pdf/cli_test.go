@@ -62,7 +62,7 @@ func runCLI(t *testing.T, stdin string, args ...string) []byte {
 }
 
 func TestCLIReadsStdinAndWritesPDFToStdout(t *testing.T) {
-	out := runCLI(t, cliSample)
+	out := runCLI(t, cliSample, "convert")
 
 	if !bytes.HasPrefix(out, []byte("%PDF-")) {
 		t.Fatal("stdout is not a PDF")
@@ -79,7 +79,7 @@ func TestCLIWritesOutputFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	runCLI(t, "", "--in", in, "--out", out)
+	runCLI(t, "", "convert", "--in", in, "--out", out)
 
 	data, err := os.ReadFile(out)
 	if err != nil {
@@ -91,9 +91,9 @@ func TestCLIWritesOutputFile(t *testing.T) {
 }
 
 func TestCLIFlagsChangeTheDocument(t *testing.T) {
-	full := runCLI(t, cliSample)
-	onePage := runCLI(t, cliSample, "--pages", "2")
-	filtered := runCLI(t, cliSample, "--heads", "h2:result", "--root-head-hide")
+	full := runCLI(t, cliSample, "convert")
+	onePage := runCLI(t, cliSample, "convert", "--pages", "2")
+	filtered := runCLI(t, cliSample, "convert", "--heads", "h2:result", "--root-head-hide")
 
 	if n := bytes.Count(onePage, []byte("/Type /Page\n")); n != 1 {
 		t.Errorf("--pages 2 produced %d pages, want 1", n)
@@ -113,7 +113,7 @@ func TestCLIVersion(t *testing.T) {
 }
 
 func TestCLIRejectsBadPages(t *testing.T) {
-	cmd := exec.Command(cliBinary, "--pages", "5-1")
+	cmd := exec.Command(cliBinary, "convert", "--pages", "5-1")
 	cmd.Stdin = strings.NewReader(cliSample)
 
 	out, err := cmd.CombinedOutput()
@@ -122,5 +122,40 @@ func TestCLIRejectsBadPages(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "5-1") {
 		t.Errorf("error message does not mention the bad range: %s", out)
+	}
+}
+
+func TestCLIHelp(t *testing.T) {
+	for _, args := range [][]string{{"help"}, {"-h"}, {"--help"}, {"-help"}} {
+		cmd := exec.Command(cliBinary, args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v: %v\n%s", args, err, out)
+		}
+		if !strings.Contains(string(out), "Usage:") {
+			t.Errorf("%v: no usage text: %s", args, out)
+		}
+	}
+}
+
+func TestCLIUnknownCommandIsAnError(t *testing.T) {
+	cmd := exec.Command(cliBinary, "bogus")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected a non-zero exit, got: %s", out)
+	}
+	if !strings.Contains(string(out), "bogus") {
+		t.Errorf("error does not name the bad command: %s", out)
+	}
+}
+
+func TestCLINoArgsIsAnError(t *testing.T) {
+	cmd := exec.Command(cliBinary)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected a non-zero exit, got: %s", out)
+	}
+	if !strings.Contains(string(out), "Usage:") {
+		t.Errorf("no usage text: %s", out)
 	}
 }
