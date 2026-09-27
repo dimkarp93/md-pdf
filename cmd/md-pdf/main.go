@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/dimkarp93/install-libs/buildinfo"
+	"github.com/dimkarp93/install-libs/shellcomplete"
 	mdlib "github.com/dimkarp93/md-libs"
 	"github.com/dimkarp93/md-libs/render"
 )
@@ -39,6 +40,19 @@ func main() {
 	pagesFlag := flag.String("pages", "", "pages to include, e.g. 1,3-5 (default: all pages except 0)")
 	headsFlag := flag.String("heads", "", "heading filters, e.g. h2:result,h3:resume")
 	rootHeadHide := flag.Bool("root-head-hide", false, "hide headings matched by --heads, keep their content")
+
+	spec := shellcomplete.Spec{
+		Bin: "md-pdf",
+		Flags: shellcomplete.With(shellcomplete.FromFlagSet(flag.CommandLine),
+			shellcomplete.Flag{Name: "-in", Files: true},
+			shellcomplete.Flag{Name: "-out", Files: true},
+		),
+		Args: shellcomplete.Anything,
+	}
+	if code, ok := spec.Handle(os.Stdout, os.Stderr, os.Args[1:]); ok {
+		os.Exit(code)
+	}
+
 	flag.Parse()
 
 	switch {
