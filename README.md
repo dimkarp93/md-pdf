@@ -95,6 +95,6 @@ make vendor
 
 ## License
 
-[MIT](LICENSE)
+[Apache-2.0](LICENSE)
 
 The bundled DejaVu Sans Condensed fonts (`cmd/md-pdf/fonts/`) are distributed under the [DejaVu Fonts License](https://dejavu-fonts.github.io/License.html).
